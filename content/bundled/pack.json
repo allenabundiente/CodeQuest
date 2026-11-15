@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "name": "CodeQuest",
+    "description": "Bundled starter content used when no remote pack is published or the published pack is invalid.",
+    "author": "CodeQuest",
+    "updatedAt": "2026-11-13",
+    "changelog": [
+      "Content packs can now be edited, published, versioned, and rolled back from /admin.",
+      "New lessons download in the background and apply after the current lesson ends."
+    ]
+  },
+  "copy": {
+    "brandName": "CodeQuest",
+    "tagline": "Learn by building",
+    "dashboardEyebrow": "Quest log",
+    "dashboardTitle": "Welcome back",
+    "dashboardSubtitle": "Build a lesson from your own code, a PDF handout, or a GitHub repo. Every solution is executed before you ever see it — anything that fails its tests is thrown away.",
+    "emptyStateTitle": "No lessons yet.",
+    "emptyStateBody": "Paste a bug you are stuck on, upload a handout, or name a goal. CodeQuest writes the exercises and proves each solution in the sandbox.",
+    "loginTitle": "Pick up the quest.",
+    "loginSubtitle": "Sessions are per-email so quotas, streaks, and your lesson library stay yours.",
+    "newLessonTitle": "What are you trying to learn?",
+    "newLessonSubtitle": "CodeQuest writes a short lesson from your source material, then executes every reference solution in the sandbox. Solutions that fail are discarded before the lesson is saved.",
+    "footer": "Every solution is executed in a sandbox before it reaches you · Tagalog & Bisaya translations · streak emails"
+  },
+  "theme": {
+    "bg": "#070a0f",
+    "panel": "#101722",
+    "text": "#e9eff7",
+    "muted": "#8ea1b6",
+    "accent": "#7cf29c",
+    "accentInk": "#062c17",
+    "blue": "#7fb2ff",
+    "border": "#202d3c",
+    "danger": "#ff8a80",
+    "warn": "#f2cc60",
+    "radius": "16px"
+  },
+  "assets": {
+    "logoMark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><rect width=\"32\" height=\"32\" rx=\"9\" fill=\"#10251c\"/><path d=\"M16 6l2.6 7.4L26 16l-7.4 2.6L16 26l-2.6-7.4L6 16l7.4-2.6z\" fill=\"#7cf29c\"/></svg>",
+    "emptyStateArt": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 80\"><rect x=\"12\" y=\"10\" width=\"96\" height=\"60\" rx=\"10\" fill=\"#0d1620\" stroke=\"#26405a\"/><path d=\"M28 30h24M28 40h40M28 50h32\" stroke=\"#3b5a78\" stroke-width=\"3\" stroke-linecap=\"round\"/><circle cx=\"88\" cy=\"34\" r=\"10\" fill=\"#7cf29c\" opacity=\"0.25\"/></svg>"
+  },
+  "lessons": [
+    {
+      "slug": "group-totals",
+      "title": "Group totals with a dictionary",
+      "summary": "Read repeating key/value lines and accumulate one total per key using a dictionary.",
+      "language": "python",
+      "difficulty": "beginner",
+      "minutes": 25,
+      "objectives": ["Accumulate by key", "Handle repeated input", "Print deterministic output"],
+      "tags": ["dictionaries", "stdin"]
+    },
+    {
+      "slug": "binary-search-boundaries",
+      "title": "Binary search boundaries",
+      "summary": "Implement a binary search that returns the first index of a target and never loops forever.",
+      "language": "python",
+      "difficulty": "intermediate",
+      "minutes": 35,
+      "objectives": ["Maintain a shrinking window", "Avoid off-by-one errors", "Prove the loop terminates"],
+      "tags": ["search", "invariants"]
+    },
+    {
+      "slug": "stdin-fizzbuzz",
+      "title": "FizzBuzz from stdin",
+      "summary": "Read a limit and print the classic FizzBuzz sequence with exact formatting.",
+      "language": "javascript",
+      "difficulty": "beginner",
+      "minutes": 20,
+      "objectives": ["Combine modulo checks", "Format output exactly", "Read a number from stdin"],
+      "tags": ["loops", "modulo"]
+    }
+  ]
+}

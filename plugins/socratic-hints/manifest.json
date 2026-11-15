@@ -1,0 +1,9 @@
+{
+  "id": "socratic-hints",
+  "name": "Socratic Hints",
+  "version": "1.0.0",
+  "description": "Adds a targeted nudge after a learner runs a step's tests, based on how the run failed.",
+  "hooks": ["attempt.evaluated"],
+  "enabled": true,
+  "author": "CodeQuest"
+}

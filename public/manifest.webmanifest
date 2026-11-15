@@ -1,0 +1,27 @@
+{
+  "name": "CodeQuest — learn by building",
+  "short_name": "CodeQuest",
+  "description": "Turn your own code, PDFs, and GitHub repos into sandbox-verified programming lessons.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#070a0f",
+  "theme_color": "#070a0f",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

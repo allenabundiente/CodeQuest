@@ -1,0 +1,9 @@
+{
+  "id": "publish-checklist",
+  "name": "Publish Checklist",
+  "version": "1.0.0",
+  "description": "Blocks a content publish when theme contrast or learner-facing copy would make the app unreadable or incomplete.",
+  "hooks": ["content.beforePublish"],
+  "enabled": true,
+  "author": "CodeQuest"
+}

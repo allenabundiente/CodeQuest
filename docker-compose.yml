@@ -1,0 +1,75 @@
+# Execution backends for CodeQuest lesson verification.
+#
+#   docker compose up -d                 # self-hosted Piston on :2000
+#   docker compose --profile judge0 up -d  # Judge0 CE on :2358
+#
+# Then point the app at the backend you started:
+#   SANDBOX_DRIVER=piston PISTON_URL=http://localhost:2000
+#   SANDBOX_DRIVER=judge0 JUDGE0_URL=http://localhost:2358
+#
+# Piston needs a privileged container because it isolates each job with nsjail.
+# Judge0 additionally needs Postgres and Redis (started by the judge0 profile).
+
+services:
+  piston:
+    image: ghcr.io/engineer-man/piston:latest
+    container_name: codequest-piston
+    privileged: true
+    ports:
+      - "2000:2000"
+    tmpfs:
+      - /piston/jobs:exec
+      - /tmp:exec
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:2000/api/v2/runtimes >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  judge0-db:
+    image: postgres:16-alpine
+    profiles: ["judge0"]
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0
+    volumes:
+      - judge0-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judge0 -d judge0"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  judge0-redis:
+    image: redis:7-alpine
+    profiles: ["judge0"]
+
+  judge0:
+    image: judge0/judge0:1.13.1
+    container_name: codequest-judge0
+    profiles: ["judge0"]
+    privileged: true
+    ports:
+      - "2358:2358"
+    depends_on:
+      judge0-db:
+        condition: service_healthy
+      judge0-redis:
+        condition: service_started
+    environment:
+      RAILS_ENV: production
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: "6379"
+      POSTGRES_HOST: judge0-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0
+      DISABLE_ANALYTICS: "true"
+    restart: unless-stopped
+
+volumes:
+  judge0-db:
