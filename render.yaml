@@ -9,10 +9,18 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Free tier has no persistent disk. SQLite lives in /tmp until the
-      # Supabase persistence migration lands; see README "Data on the free tier".
+      # Free tier has no persistent disk. SQLite is a local cache restored from
+      # and snapshotted to Supabase Storage; see README "Data on the free tier".
       - key: DATABASE_PATH
         value: /tmp/codequest.db
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: codequest
+      - key: SUPABASE_SNAPSHOT_PATH
+        value: codequest.db
       - key: NEXT_PUBLIC_APP_VERSION
         sync: false
       - key: MIN_SUPPORTED_VERSION

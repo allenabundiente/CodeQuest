@@ -27,6 +27,7 @@ Built with Next.js (App Router), TypeScript, Node's built-in SQLite, and Zod.
 | Content CLI | `npm run content:export` / `content:import` for pack portability |
 | In-app updates | Prompt-mode service worker (`public/sw.js`), mascot update banner, Settings manual check, staged content swaps, required-update gate |
 | Operations | `/health` + `/api/health` + `/api/ready`, cold-start wake screen, JSON feature flags, Sentry error reporting, Docker `render.yaml`, GitHub Actions CI, responsive/axe E2E, mirror and keep-alive jobs |
+| Durable free-tier data | SQLite runs as an ephemeral local store while consistent snapshots are restored from and uploaded to a private Supabase Storage bucket after writes |
 
 ## Responsive UI
 
@@ -100,6 +101,10 @@ explains what to configure — generation is simply disabled.
 | `NEXT_PUBLIC_ENABLE_SW` | Set `false` to disable service-worker registration |
 | `FEATURE_FLAGS` | JSON overrides, e.g. `{"githubImport":false,"pwaUpdates":false}` |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Server- and browser-side error reporting; leave empty to disable |
+| `SUPABASE_URL` | Supabase project URL for snapshot persistence; empty disables it locally |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only service-role key; never expose it with `NEXT_PUBLIC_` |
+| `SUPABASE_STORAGE_BUCKET`, `SUPABASE_SNAPSHOT_PATH` | Private bucket and object name (defaults `codequest` / `codequest.db`) |
+| `PERSIST_DEBOUNCE_MS`, `PERSIST_INTERVAL_MS` | Upload debounce and safety interval (defaults 1s / 30s) |
 | `PORT` | Port for `npm start` (Render injects it) |
 
 ## How a lesson is built
@@ -336,7 +341,7 @@ retried, and failed sends are recorded so they are visible.
 | `POST` | `/api/admin/content/publish` | Runs publish hooks, then releases the draft |
 | `POST` | `/api/admin/content/rollback` | `{ version }` — republishes an old release |
 | `GET/POST` | `/api/admin/plugins` | Plugin health / reset isolation |
-| `GET` | `/api/health` | Database, provider, sandbox, and email status |
+| `GET` | `/api/health` | Database, provider, sandbox, email, and Supabase snapshot status |
 | `GET` | `/api/ready` | Readiness probe for the deploy platform (503 when not ready) |
 | `GET` | `/api/version` | App/content/minimum versions and changelog |
 | `GET` | `/api/content/active` | Full active pack with an ETag for conditional downloads |
@@ -345,7 +350,9 @@ retried, and failed sends are recorded so they are visible.
 ## Data model
 
 SQLite lives at `DATABASE_PATH` (default `.data/codequest.db`) and is created
-with `CREATE TABLE IF NOT EXISTS` on first open:
+with `CREATE TABLE IF NOT EXISTS` on first open. On the free Render plan the
+file is a local cache at `/tmp`, restored from and snapshotted to Supabase
+Storage as described above:
 
 `users`, `sessions`, `lessons`, `hints`, `translations`, `attempts`,
 `usage_events`, `ai_cache`, `daily_activity`, `email_log`, `content_packs`,
@@ -425,8 +432,9 @@ and emergency recovery.
    service uses the `Dockerfile`, the free plan, Singapore, `autoDeploy: true`
    on `main`, and `healthCheckPath: /health`.
 3. Fill the `sync: false` values in the Render dashboard: provider keys,
-   `DEVELOPER_EMAILS`, `NEXT_PUBLIC_APP_VERSION`, the Piston/Judge0 URL and
-   token, Resend, `APP_URL`, and Sentry DSNs. `CRON_SECRET` is generated.
+   `DEVELOPER_EMAILS`, `NEXT_PUBLIC_APP_VERSION`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`, the Piston/Judge0 URL and token, Resend,
+   `APP_URL`, and Sentry DSNs. `CRON_SECRET` is generated.
 4. Set the GitHub Actions secret `RENDER_APP_URL` to the public origin so
    `.github/workflows/keepalive.yml` can ping `/health` every 10 minutes.
 5. Set `APP_URL` to the same origin for streak-email links, and schedule the
@@ -440,13 +448,40 @@ cold starts.
 #### Data on the free tier
 
 The free plan has no persistent disk, so `render.yaml` sets
-`DATABASE_PATH=/tmp/codequest.db`. Accounts, sessions, lessons, attempts, and
-content are therefore **ephemeral**: they reset on redeploy or instance
-replacement. The requested Supabase persistence layer is not implemented in
-this build; the app still uses synchronous `node:sqlite`. Do not store data you
-need to keep on the free deployment until that migration lands. A paid plan
-with a mounted disk, or a completed Supabase adapter, is required for durable
-data.
+`DATABASE_PATH=/tmp/codequest.db`. SQLite remains the local query engine, but it
+is no longer the durable copy:
+
+1. On boot, `instrumentation.ts` runs before requests. If the local database is
+   absent, it downloads the latest snapshot from a private Supabase Storage
+   object and validates the SQLite header before opening it.
+2. Every write through `getDb()` marks the database dirty. Uploads are
+   debounced (1 second by default), with a 30-second safety interval and a
+   `SIGTERM` flush during shutdown.
+3. `VACUUM INTO` creates a consistent snapshot in `/tmp`, which is uploaded
+   with `x-upsert` to the configured bucket. A failed upload is retried on the
+   next interval and reported through `/api/health`.
+
+Set these Render secrets:
+
+| Variable | Value |
+| --- | --- |
+| `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project **service_role** key, server-side only |
+| `SUPABASE_STORAGE_BUCKET` | `codequest` (optional) |
+| `SUPABASE_SNAPSHOT_PATH` | `codequest.db` (optional) |
+
+Create a Supabase project, then either let the app create the private bucket
+on first upload or create a private bucket named `codequest` in **Storage**.
+The service-role key is required to create the bucket and write the object; it
+must never be sent to the browser or committed.
+
+This is snapshot persistence, not a table-by-table Postgres migration. It keeps
+accounts, sessions, lessons, hints, attempts, usage, and published content
+across free Render restarts with roughly a one-second recovery point while the
+process is running. An abrupt `SIGKILL` can lose up to the safety interval
+(30 seconds). Run a single instance; concurrent instances would last-write-win.
+For horizontal scaling or SQL-level reporting in Supabase, move the repository
+layer to Postgres tables instead.
 
 ### GitHub Actions
 
@@ -523,7 +558,10 @@ The unit suite covers provider fallback/repair/caching/quota, Piston and Judge0
 request shapes, verification semantics (including timeouts and sandbox
 outages), GitHub import filtering, lesson discard behavior, solution
 redaction, the hint ladder, translation caching/shape checks, streak math,
-email gating/deduplication, and the Resend client. It also covers manifest
+email gating/deduplication, and the Resend client. Persistence coverage runs
+against a mock Supabase Storage server and verifies bucket creation, upload,
+restore, retry after transient 5xx responses, corrupt-snapshot rejection, and
+local-file precedence. It also covers manifest
 validation, hook timeouts and failure isolation, sample-plugin behavior,
 content draft/publish/rollback/audit, export/import, invalid-pack fallback,
 and developer-role policy. Release coverage adds semver comparison and the
@@ -547,12 +585,12 @@ no-op without a DSN, and failure isolation).
   dedicated SQLite file and keep `DEVELOPER_EMAILS` short.
 - **Model cost** is controlled by the rolling quota, the response cache, and by
   capping exports (12 GitHub files, 5 tests per step, 4 steps per lesson).
-- **Free Render has no persistent disk.** `render.yaml` uses the free Docker
-  plan with `DATABASE_PATH=/tmp/codequest.db`, so data resets on redeploy or
-  instance replacement. The Supabase persistence migration is not implemented;
-  use a paid plan with a mounted disk or finish that adapter before relying on
-  the deployment for durable data. Multiple instances also require a networked
-  database.
+- **Free Render persistence is snapshot-based and single-instance.** SQLite
+  lives at `/tmp/codequest.db` and is restored from and uploaded to Supabase
+  Storage. Normal writes have about a one-second recovery point; an abrupt
+  kill can lose up to `PERSIST_INTERVAL_MS` (default 30 seconds). Do not run
+  multiple instances against one snapshot. A normalized Postgres adapter is
+  still the right choice for horizontal scaling or SQL reporting in Supabase.
 - **Prompt-mode updates are shell-level, not data migrations.** A new build may
   need schema changes; `createDb()` migrates additively, so avoid destructive
   migrations that would break an older tab mid-session.

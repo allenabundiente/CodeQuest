@@ -1,6 +1,7 @@
 import { aiProviderIds } from "@/lib/ai";
 import { getDb } from "@/lib/db";
 import { json } from "@/lib/http";
+import { persistenceStatus } from "@/lib/persistence";
 import { sandboxConfigFromEnv, sandboxRequired } from "@/lib/sandbox";
 
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ export async function GET() {
     {
       ok: database === "ok",
       database,
+      persistence: persistenceStatus(),
       ai: {
         configured: providers.length > 0,
         providers,

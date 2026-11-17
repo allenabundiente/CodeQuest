@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { markDbDirty } from "./persistence-state";
 
 export type Db = DatabaseSync;
 
@@ -149,6 +150,8 @@ export function createDb(
   }
   const db = new DatabaseSync(path);
   db.exec("PRAGMA foreign_keys = ON;");
+  // The snapshot connection and the app connection share the WAL file.
+  db.exec("PRAGMA busy_timeout = 5000;");
   if (path !== ":memory:") {
     db.exec("PRAGMA journal_mode = WAL;");
   }
@@ -169,16 +172,71 @@ function migrate(db: Db): void {
   }
 }
 
+type Statement = ReturnType<Db["prepare"]>;
+
+function wrapStatement(statement: Statement): Statement {
+  return new Proxy(statement, {
+    get(target, property) {
+      if (property === "run") {
+        return (...args: Parameters<typeof target.run>) => {
+          const result = target.run(...args);
+          markDbDirty();
+          return result;
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as Statement;
+}
+
+/**
+ * Mark every write so the Supabase snapshot layer can schedule an upload.
+ * Reads pass straight through.
+ */
+function wrapDb(db: Db): Db {
+  return new Proxy(db, {
+    get(target, property) {
+      if (property === "prepare") {
+        return (sql: string) => wrapStatement(target.prepare(sql));
+      }
+      if (property === "exec") {
+        return (sql: string) => {
+          const result = target.exec(sql);
+          markDbDirty();
+          return result;
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as Db;
+}
+
+let rawSingleton: Db | null = null;
 let singleton: Db | null = null;
 
 export function getDb(): Db {
-  singleton ??= createDb();
-  return singleton;
+  if (!rawSingleton) {
+    rawSingleton = createDb();
+    singleton = wrapDb(rawSingleton);
+  }
+  return singleton as Db;
+}
+
+/**
+ * The unwrapped handle. Used by the snapshot layer for `VACUUM INTO`, which
+ * must not re-enter the write hook.
+ */
+export function getRawDb(): Db {
+  getDb();
+  return rawSingleton as Db;
 }
 
 /** Test helper: drop the process-wide handle. */
 export function resetDb(): void {
-  singleton?.close();
+  rawSingleton?.close();
+  rawSingleton = null;
   singleton = null;
 }
 
