@@ -17,7 +17,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      "DATABASE_PATH=.data/e2e.db DEVELOPER_EMAILS=e2e@codequest.app NEXT_PUBLIC_APP_VERSION=0.4.0 MIN_SUPPORTED_VERSION=0.1.0 npm run dev -- --port 3100",
+      "DATABASE_PATH=.data/e2e.db DEVELOPER_EMAILS=e2e@codequest.app NEXT_PUBLIC_APP_VERSION=0.4.0 MIN_SUPPORTED_VERSION=0.1.0 ./node_modules/.bin/next dev -H 127.0.0.1 -p 3100",
     url: `${baseURL}/login`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
