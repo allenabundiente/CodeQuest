@@ -1,34 +1,28 @@
 services:
   - type: web
     name: codequest
-    runtime: node
-    plan: starter
+    runtime: docker
+    plan: free
     region: singapore
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm run start
-    healthCheckPath: /api/ready
-    autoDeploy: false
-    disk:
-      name: codequest-data
-      mountPath: /var/data
-      sizeGB: 1
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
-      - key: NODE_VERSION
-        value: 22.13.0
       - key: NODE_ENV
         value: production
+      # Free tier has no persistent disk. SQLite lives in /tmp until the
+      # Supabase persistence migration lands; see README "Data on the free tier".
       - key: DATABASE_PATH
-        value: /var/data/codequest.db
+        value: /tmp/codequest.db
       - key: NEXT_PUBLIC_APP_VERSION
         sync: false
       - key: MIN_SUPPORTED_VERSION
         value: 0.1.0
       - key: NEXT_PUBLIC_ENABLE_SW
         value: "true"
-      - key: DEVELOPER_EMAILS
-        sync: false
       - key: FEATURE_FLAGS
         value: "{}"
+      - key: DEVELOPER_EMAILS
+        sync: false
       - key: OPENROUTER_API_KEY
         sync: false
       - key: GROQ_API_KEY

@@ -1,0 +1,24 @@
+name: Keep Render awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping /health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping service
+        env:
+          RENDER_APP_URL: ${{ secrets.RENDER_APP_URL }}
+        run: |
+          if [ -z "$RENDER_APP_URL" ]; then
+            echo "::warning::RENDER_APP_URL is not configured; keep-alive skipped."
+            exit 0
+          fi
+          curl -fsS --retry 3 --retry-delay 10 --max-time 90 "$RENDER_APP_URL/health"

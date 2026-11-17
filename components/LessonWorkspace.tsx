@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { GuidedEditor } from "@/components/editor/GuidedEditor";
+import { SolutionEditor } from "@/components/editor/SolutionEditor";
 import {
   useCallback,
   useEffect,
@@ -87,6 +90,7 @@ export function LessonWorkspace({
   const draftKey = `cq_draft_${lesson.id}`;
 
   const [stepIndex, setStepIndex] = useState(0);
+  const [editorMode, setEditorMode] = useState<"guided" | "code">("guided");
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [reports, setReports] = useState<Record<number, VerificationReport | null>>({});
   const [pluginMessages, setPluginMessages] = useState<Record<number, string[]>>({});
@@ -142,6 +146,11 @@ export function LessonWorkspace({
   }
 
   async function runTests() {
+    if (running) return;
+    if (!code.trim()) {
+      setRunError("Write some code first.");
+      return;
+    }
     setRunning(true);
     setRunError(null);
     try {
@@ -227,19 +236,25 @@ export function LessonWorkspace({
     }
   }
 
-  function handleTab(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Tab") return;
-    event.preventDefault();
-    const element = event.currentTarget;
-    const start = element.selectionStart;
-    const end = element.selectionEnd;
-    const next = `${code.slice(0, start)}  ${code.slice(end)}`;
-    updateCode(next);
-    requestAnimationFrame(() => {
-      element.selectionStart = start + 2;
-      element.selectionEnd = start + 2;
-    });
-  }
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable='true'], .cm-editor",
+        )
+      ) {
+        return;
+      }
+      if (/^[1-9]$/.test(event.key)) {
+        const index = Number(event.key) - 1;
+        if (index < lesson.steps.length) setStepIndex(index);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [lesson.steps.length]);
 
   return (
     <div className="stack">
@@ -312,9 +327,9 @@ export function LessonWorkspace({
               something you are actually stuck on.
             </p>
           </div>
-          <a className="btn btn-primary btn-sm" href="/new">
+          <Link className="btn btn-primary btn-sm" href="/new">
             New lesson
-          </a>
+          </Link>
         </div>
       ) : null}
 
@@ -337,8 +352,9 @@ export function LessonWorkspace({
         ))}
       </div>
 
-      <div className="workspace">
-        <section className="panel brief">
+      <div className="challenge-shell">
+        <div className="challenge-layout">
+        <section className="panel brief challenge-panel">
           <div>
             <span className="label">Step {stepIndex + 1} of {lesson.steps.length}</span>
             <h3>{translatedStep?.title ?? step.title}</h3>
@@ -417,40 +433,88 @@ export function LessonWorkspace({
           </div>
         </section>
 
-        <section className="panel">
+        <section
+          className="panel challenge-panel challenge-editor"
+          aria-labelledby="workspace-title"
+        >
           <div className="panel-head">
-            <h2>Workspace</h2>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => updateCode(step.starterCode)}
-              disabled={running}
-            >
-              Reset starter
-            </button>
+            <h2 id="workspace-title">Workspace</h2>
+            <div className="editor-tools">
+              <div className="segmented editor-mode" role="group" aria-label="Editor mode">
+                <button
+                  type="button"
+                  className={editorMode === "guided" ? "tab active" : "tab"}
+                  aria-pressed={editorMode === "guided"}
+                  onClick={() => setEditorMode("guided")}
+                >
+                  Blocks
+                </button>
+                <button
+                  type="button"
+                  className={editorMode === "code" ? "tab active" : "tab"}
+                  aria-pressed={editorMode === "code"}
+                  onClick={() => setEditorMode("code")}
+                >
+                  Full code
+                </button>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => updateCode(step.starterCode)}
+                disabled={running}
+              >
+                Reset
+              </button>
+            </div>
           </div>
 
-          <div className="field">
-            <label className="label" htmlFor="solution">
-              Your program · reads stdin, writes stdout
-            </label>
-            <textarea
-              id="solution"
-              className="textarea code"
-              value={code}
-              onChange={(event) => updateCode(event.target.value)}
-              onKeyDown={handleTab}
-              spellCheck={false}
-              disabled={running}
+          <div
+            className={
+              editorMode === "guided"
+                ? "editor-pane guided-pane is-active"
+                : "editor-pane guided-pane"
+            }
+          >
+            <GuidedEditor
+              key={stepIndex}
+              code={code}
+              onChange={updateCode}
+              onRun={runTests}
+              readOnly={running}
+              onUseCode={() => setEditorMode("code")}
             />
           </div>
 
-          <div className="workspace-actions">
+          <div
+            className={
+              editorMode === "code"
+                ? "editor-pane code-pane is-active"
+                : "editor-pane code-pane"
+            }
+          >
+            <SolutionEditor
+              value={code}
+              language={lesson.language}
+              onChange={updateCode}
+              onRun={runTests}
+              readOnly={running}
+            />
+          </div>
+
+          <p className="small muted editor-note">
+            <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> runs tests. Blocks
+            mode fills the generated TODO lines; Full code is there for anything
+            else.
+          </p>
+
+          <div className="workspace-actions challenge-actions">
             <button
               type="button"
               className="btn btn-primary"
               onClick={runTests}
               disabled={running || !code.trim()}
+              aria-keyshortcuts="Control+Enter Meta+Enter"
             >
               {running ? (
                 <>
@@ -466,16 +530,53 @@ export function LessonWorkspace({
             {report && !report.passed ? (
               <span className="badge badge-warn">not passing yet</span>
             ) : null}
+            <div className="step-jump">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setStepIndex(Math.max(0, stepIndex - 1))}
+                disabled={stepIndex === 0 || running}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() =>
+                  setStepIndex(Math.min(lesson.steps.length - 1, stepIndex + 1))
+                }
+                disabled={stepIndex >= lesson.steps.length - 1 || running}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="panel challenge-panel challenge-output"
+          aria-labelledby="output-title"
+          aria-live="polite"
+        >
+          <div className="panel-head">
+            <h2 id="output-title">Output</h2>
+            {report ? (
+              <span
+                className={report.passed ? "badge badge-ok" : "badge badge-warn"}
+              >
+                {report.passed ? "passed" : "needs work"}
+              </span>
+            ) : null}
           </div>
 
           {runError ? (
-            <div className="alert alert-error" style={{ marginTop: 12 }}>
+            <div className="alert alert-error" style={{ marginBottom: 12 }}>
               {runError}
             </div>
           ) : null}
 
           {(pluginMessages[stepIndex] ?? []).length > 0 ? (
-            <div className="alert alert-ok" style={{ marginTop: 12 }}>
+            <div className="alert alert-ok" style={{ marginBottom: 12 }}>
               <strong className="small">Plugin tips</strong>
               <ul style={{ marginTop: 6 }}>
                 {(pluginMessages[stepIndex] ?? []).map((message) => (
@@ -521,8 +622,15 @@ export function LessonWorkspace({
                 </div>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <div className="output-empty">
+              <p className="small muted">
+                Run tests to see each case&apos;s expected and actual output.
+              </p>
+            </div>
+          )}
         </section>
+        </div>
       </div>
     </div>
   );

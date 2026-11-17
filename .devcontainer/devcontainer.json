@@ -1,0 +1,28 @@
+{
+  "name": "CodeQuest",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [3000, 3001, 2000, 2358],
+  "portsAttributes": {
+    "3000": { "label": "CodeQuest web", "onAutoForward": "notify" },
+    "3001": { "label": "CodeQuest preview", "onAutoForward": "silent" },
+    "2000": { "label": "Piston sandbox", "onAutoForward": "silent" },
+    "2358": { "label": "Judge0 sandbox", "onAutoForward": "silent" }
+  },
+  "postCreateCommand": "npm ci",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker",
+        "ms-playwright.playwright"
+      ]
+    }
+  },
+  "remoteUser": "node"
+}

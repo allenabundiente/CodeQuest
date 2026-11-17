@@ -4,9 +4,12 @@ out/
 build/
 .data/
 *.log
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
+backup_key*
+artifacts/
+playwright-report/
+test-results/
 .DS_Store
 *.tsbuildinfo
 coverage/

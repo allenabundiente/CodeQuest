@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PathMap } from "@/components/dashboard/PathMap";
 import { aiProviderIds, getAi } from "@/lib/ai";
 import { loadActiveContent } from "@/lib/content/store";
 import { svgToDataUri } from "@/lib/content/svg";
@@ -59,7 +60,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="streak-card">
+        <div className="streak-card hero-streak">
           <div className="streak-num">{streak.current}</div>
           <p className="streak-label">day streak</p>
           <div className="streak-days" aria-label="Last seven days">
@@ -143,37 +144,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="lesson-grid">
-            {lessons.map((lesson) => (
-              <Link
-                key={lesson.id}
-                href={`/lessons/${lesson.id}`}
-                className="card"
-              >
-                <div className="card-top">
-                  <span className="badge">{lesson.difficulty}</span>
-                  <span className="badge badge-lang">{lesson.language}</span>
-                  {lesson.verified ? (
-                    <span className="badge badge-ok">sandbox verified</span>
-                  ) : null}
-                </div>
-                <h3>{lesson.title}</h3>
-                <p className="muted small clamp-3">{lesson.summary}</p>
-                <div className="card-foot">
-                  <span>
-                    {lesson.stepCount} step{lesson.stepCount === 1 ? "" : "s"} ·{" "}
-                    {lesson.source}
-                  </span>
-                  <span>
-                    {new Date(lesson.createdAt).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <PathMap lessons={lessons} />
         )}
       </section>
 
